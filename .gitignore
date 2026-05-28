@@ -1,0 +1,29 @@
+# Keil MDK build artifacts
+Objects/
+Listings/
+*.axf
+*.hex
+*.o
+*.d
+*.crf
+*.htm
+*.build_log.htm
+*.lnp
+*.sct
+*.map
+*.iex
+
+# Keil user config
+*.uvguix.*
+*.uvguix.*.*
+DebugConfig/
+
+# Cleanup scripts
+keilkill.bat
+
+# Project backup files
+*.bak
+
+# OS files
+Thumbs.db
+.DS_Store

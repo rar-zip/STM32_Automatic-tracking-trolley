@@ -54,7 +54,7 @@ li {
   z-index: 0;
 }
 .try {
-  height:5000px;
+  height:3000px;
 }
 
 
@@ -75,7 +75,7 @@ li {
 
 
 
-
+/*尾页*/
 .footer {
   background: black;
   color: white;

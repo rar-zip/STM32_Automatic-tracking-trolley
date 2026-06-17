@@ -6,6 +6,143 @@
 
 | 模块 | 型号                 | 功能                      |
 | ---- | -------------------- | ------------------------- |
+b
+B
+B
+B
+B
+B
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+A
+B
+B
+B
+B
+B
+B
+
+
 | 主控 | STM32F103C8T6        | 电机控制、传感器融合      |
 | 视觉 | OpenMV Cam H7        | 黑线识别、位置偏差计算    |
 | 电机 | 4路 PWM (TIM4 CH1-4) | 差速驱动                  |
@@ -84,7 +221,7 @@ STM32 主循环采用 P（比例）控制器：
 
 ### 3. 调试
 
-- 上电后 OpenMV 绿灯闪烁 = 追踪中，红灯闪烁 = 搜索中
+- 上电后 OpenMV 蓝灯闪烁 = 追踪中，红灯闪烁 = 搜索中
 - OpenMV IDE 串行终端可看到 `X_err: xx, Y_err: yy` 或 `LOST`
 - STM32 可通过 OLED（待集成）或串口查看接收数据
 
@@ -100,3 +237,5 @@ STM32 主循环采用 P（比例）控制器：
     ├── stm32_car_test/  # STM32 通信测试工程
     └── openmv_h7_test/  # OpenMV 追踪测试脚本
 ```
+
+### mulu

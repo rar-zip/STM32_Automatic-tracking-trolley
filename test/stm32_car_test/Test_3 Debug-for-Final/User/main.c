@@ -101,47 +101,55 @@ int main(void)
     // 【安全机制】等待按下 PA15 按键后，才正式启动循迹
     while(Key_GetNum() == 0);
 
+    // 【测试模式】启动后先测试轮子
+    // 阶段1: 两个轮子同时前进1秒
+    Set_Motor(1, 70);
+    Set_Motor(2, 70);
+    for(uint32_t i=0; i<72000000; i++);
+    // 阶段2: 停止0.5秒
+    Set_Motor(1, 0);
+    Set_Motor(2, 0);
+    for(uint32_t i=0; i<36000000; i++);
+
     while (1)
     {
+        // 如果收到新数据
         if (new_data_flag == 1)
         {
             new_data_flag = 0; 
             
-           if (target_data.status == 1) 
+            // 检查状态：status=1 表示看到目标（根据摄像头代码）
+            if (target_data.status == 1)  
             {
-                lose_line_cnt = 0; // 看到目标，计数器清零
+                lose_line_cnt = 0;
                 
-                // 目标偏右，右转：左轮猛进，右轮稍微后退 (形成原地差速，转弯更猛！)
-                // 阈值调大到 30，防止轻微的画面噪点让小车频繁抽搐
+                // 目标偏右，右转：左轮快，右轮慢
                 if (target_data.x_err > 30) 
                 {
-                    Set_Motor(1, 85);  // 左轮加大马力冲
-                    Set_Motor(2, -25); // 右轮给一点倒车动力，把车头瞬间甩过去
+                    Set_Motor(1, 85);  // 左轮快
+                    Set_Motor(2, 60);  // 右轮慢（提高速度确保能启动）
                 }
-                // 目标偏左，左转：左轮后退，右轮猛进
+                // 目标偏左，左转：左轮慢，右轮快
                 else if (target_data.x_err < -30) 
                 {
-                    Set_Motor(1, -25); 
-                    Set_Motor(2, 85);  
+                    Set_Motor(1, 60);  // 左轮慢（提高速度确保能启动）
+                    Set_Motor(2, 85);  // 右轮快
                 }
-                // 偏差在 -30 到 30 之间，说明车头很正，平稳直行
+                // 中间，两个轮子同速直行
                 else 
                 {
-                    Set_Motor(1, 60); // 直行速度降到 60，给遇到弯道时留出充足的反应时间
-                    Set_Motor(2, 60); 
+                    Set_Motor(1, 85);  // 两个轮子相同速度直行（加快10）
+                    Set_Motor(2, 85);
                 }
             }
             else 
             {
-                // 没看到目标，累加计数器
                 lose_line_cnt++;
-                
-                // 连续 10 帧(约0.3秒)没看到，才停车
                 if(lose_line_cnt > 10) 
                 {
-                    Set_Motor(1, 0); // 左前轮刹车
-                    Set_Motor(2, 0); // 右前轮刹车
-                    lose_line_cnt = 10; // 防止变量溢出
+                    Set_Motor(1, 0);
+                    Set_Motor(2, 0);
+                    lose_line_cnt = 10;
                 }
             }
         }

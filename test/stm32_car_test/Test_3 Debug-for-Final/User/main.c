@@ -24,6 +24,13 @@ uint8_t rx_buffer[RX_BUF_SIZE]; // DMA 接收缓冲区
 OpenMV_Data_t target_data;      // 解析后的最终数据
 uint8_t new_data_flag = 0;      // 新数据标志位
 
+// 控制参数
+#define BASE_SPEED     80      // 基础速度
+#define MAX_SPEED      95      // 最大速度
+#define TURN_SENSITIVITY 0.6   // 转向灵敏度
+#define LEFT_COMPENSATE 0      // 左轮速度补偿（正值=加快，负值=减慢）
+#define RIGHT_COMPENSATE 0     // 右轮速度补偿（正值=加快，负值=减慢）
+
 
 // ------------------- 2. USART1 与 DMA 初始化函数 -------------------
 void OpenMV_UART_Init(void)
@@ -113,34 +120,33 @@ int main(void)
 
     while (1)
     {
-        // 如果收到新数据
         if (new_data_flag == 1)
         {
             new_data_flag = 0; 
             
-            // 检查状态：status=1 表示看到目标（根据摄像头代码）
             if (target_data.status == 1)  
             {
                 lose_line_cnt = 0;
                 
-                // 目标偏右，右转：左轮快，右轮慢
-                if (target_data.x_err > 30) 
-                {
-                    Set_Motor(1, 85);  // 左轮快
-                    Set_Motor(2, 60);  // 右轮慢（提高速度确保能启动）
-                }
-                // 目标偏左，左转：左轮慢，右轮快
-                else if (target_data.x_err < -30) 
-                {
-                    Set_Motor(1, 60);  // 左轮慢（提高速度确保能启动）
-                    Set_Motor(2, 85);  // 右轮快
-                }
-                // 中间，两个轮子同速直行
-                else 
-                {
-                    Set_Motor(1, 85);  // 两个轮子相同速度直行（加快10）
-                    Set_Motor(2, 85);
-                }
+                int16_t x_err = target_data.x_err;
+                
+                // 根据X轴偏差计算转向量
+                // x_err > 0: 目标在右边，需要右转（左轮快，右轮慢）
+                // x_err < 0: 目标在左边，需要左转（左轮慢，右轮快）
+                int16_t turn_amount = (int16_t)(x_err * TURN_SENSITIVITY);
+                
+                // 计算左右轮速度（加入补偿）
+                int16_t left_speed  = BASE_SPEED + turn_amount + LEFT_COMPENSATE;
+                int16_t right_speed = BASE_SPEED - turn_amount + RIGHT_COMPENSATE;
+                
+                // 速度限制
+                if (left_speed > MAX_SPEED)  left_speed = MAX_SPEED;
+                if (left_speed < 0)          left_speed = 0;
+                if (right_speed > MAX_SPEED) right_speed = MAX_SPEED;
+                if (right_speed < 0)         right_speed = 0;
+                
+                Set_Motor(1, left_speed);
+                Set_Motor(2, right_speed);
             }
             else 
             {

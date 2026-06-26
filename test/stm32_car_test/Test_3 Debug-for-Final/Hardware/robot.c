@@ -58,16 +58,16 @@ void Set_Motor(uint8_t motor, int16_t speed)
 
 void makerobo_run(int8_t speed, uint16_t time)  // 前进
 {
-    Set_Motor(1, speed); // 左前正转
-    Set_Motor(2, speed); // 右前正转
+    Set_Motor(1, -speed); // 左前正转
+    Set_Motor(2, -speed); // 右前正转
     Delay_ms(time);                 
     makerobo_brake(0);           
 }
 
 void makerobo_back(int8_t speed, uint16_t time) // 后退
 {
-    Set_Motor(1, -speed); 
-    Set_Motor(2, -speed); 
+    Set_Motor(1, speed); 
+    Set_Motor(2, speed); 
     Delay_ms(time);                 
     makerobo_brake(0);           
 }
@@ -82,14 +82,14 @@ void makerobo_brake(uint16_t time) // 刹车
 void makerobo_Left(int8_t speed, uint16_t time) // 差速左转 (左停，右进)
 {
     Set_Motor(1, 0);     
-    Set_Motor(2, speed); 
+    Set_Motor(2, -speed); 
     Delay_ms(time);                 
     makerobo_brake(0);           
 }
 
 void makerobo_Right(int8_t speed, uint16_t time) // 差速右转 (左进，右停)
 {
-    Set_Motor(1, speed); 
+    Set_Motor(1, -speed); 
     Set_Motor(2, 0);     
     Delay_ms(time);                 
     makerobo_brake(0);           
@@ -97,8 +97,8 @@ void makerobo_Right(int8_t speed, uint16_t time) // 差速右转 (左进，右�
 
 void makerobo_Spin_Left(int8_t speed, uint16_t time) // 左原地旋转
 {
-    Set_Motor(1, -speed); // 左侧退
-    Set_Motor(2, speed);  // 右侧进
+    Set_Motor(1, speed); // 左侧退
+    Set_Motor(2, -speed);  // 右侧进
     Delay_ms(time);                    
     makerobo_brake(0);           			
 }

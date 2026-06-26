@@ -25,9 +25,11 @@ OpenMV_Data_t target_data;      // 解析后的最终数据
 uint8_t new_data_flag = 0;      // 新数据标志位
 
 // 控制参数
-#define BASE_SPEED     80      // 基础速度
+#define BASE_SPEED     85      // 基础速度
 #define MAX_SPEED      95      // 最大速度
-#define TURN_SENSITIVITY 0.6   // 转向灵敏度
+#define MIN_SPEED      60      // 最小速度（确保轮子不会停转）
+#define TURN_SENSITIVITY 0.10  // 转向灵敏度（进一步降低）
+#define MAX_TURN_DIFF  15      // 最大速度差（限制转弯幅度）
 #define LEFT_COMPENSATE 0      // 左轮速度补偿（正值=加快，负值=减慢）
 #define RIGHT_COMPENSATE 0     // 右轮速度补偿（正值=加快，负值=减慢）
 
@@ -108,10 +110,10 @@ int main(void)
     // 【安全机制】等待按下 PA15 按键后，才正式启动循迹
     while(Key_GetNum() == 0);
 
-    // 【测试模式】启动后先测试轮子
-    // 阶段1: 两个轮子同时前进1秒
-    Set_Motor(1, 70);
-    Set_Motor(2, 70);
+    // 【测试模式】启动后先测试轮子（反向）
+    // 阶段1: 两个轮子同时后退1秒
+    Set_Motor(1, -70);
+    Set_Motor(2, -70);
     for(uint32_t i=0; i<72000000; i++);
     // 阶段2: 停止0.5秒
     Set_Motor(1, 0);
@@ -130,20 +132,24 @@ int main(void)
                 
                 int16_t x_err = target_data.x_err;
                 
-                // 根据X轴偏差计算转向量
-                // x_err > 0: 目标在右边，需要右转（左轮快，右轮慢）
-                // x_err < 0: 目标在左边，需要左转（左轮慢，右轮快）
-                int16_t turn_amount = (int16_t)(x_err * TURN_SENSITIVITY);
+                // 根据X轴偏差计算转向量（反向运动模式）
+                // x_err > 0: 目标在右边，需要向右转（左轮慢，右轮快）
+                // x_err < 0: 目标在左边，需要向左转（左轮快，右轮慢）
+                int16_t turn_amount = -(int16_t)(x_err * TURN_SENSITIVITY);
                 
-                // 计算左右轮速度（加入补偿）
-                int16_t left_speed  = BASE_SPEED + turn_amount + LEFT_COMPENSATE;
-                int16_t right_speed = BASE_SPEED - turn_amount + RIGHT_COMPENSATE;
+                // 限制最大速度差，防止转弯过猛
+                if (turn_amount > MAX_TURN_DIFF) turn_amount = MAX_TURN_DIFF;
+                if (turn_amount < -MAX_TURN_DIFF) turn_amount = -MAX_TURN_DIFF;
                 
-                // 速度限制
-                if (left_speed > MAX_SPEED)  left_speed = MAX_SPEED;
-                if (left_speed < 0)          left_speed = 0;
-                if (right_speed > MAX_SPEED) right_speed = MAX_SPEED;
-                if (right_speed < 0)         right_speed = 0;
+                // 计算左右轮速度（反向运动：速度为负值）
+                int16_t left_speed  = -(BASE_SPEED + turn_amount + LEFT_COMPENSATE);
+                int16_t right_speed = -(BASE_SPEED - turn_amount + RIGHT_COMPENSATE);
+                
+                // 速度限制（确保两个轮子都不会停转，注意是负值范围）
+                if (left_speed < -MAX_SPEED)  left_speed = -MAX_SPEED;
+                if (left_speed > -MIN_SPEED)  left_speed = -MIN_SPEED;
+                if (right_speed < -MAX_SPEED) right_speed = -MAX_SPEED;
+                if (right_speed > -MIN_SPEED) right_speed = -MIN_SPEED;
                 
                 Set_Motor(1, left_speed);
                 Set_Motor(2, right_speed);

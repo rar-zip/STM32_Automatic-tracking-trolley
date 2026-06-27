@@ -16,8 +16,6 @@ for _ in range(30):
 sensor.set_auto_gain(False)
 sensor.set_auto_whitebal(False)
 
-init_video_dir()
-
 uart = UART(3, 115200)  # UART(3) 对应 P4(TX)/P5(RX)
 clock = time.clock()
 
@@ -204,5 +202,5 @@ while True:
     img.draw_rectangle(ROI_RECT, color=(0, 0, 255))
     img.draw_line(SCREEN_CENTER_X, 0, SCREEN_CENTER_X, sensor.height(), color=(128, 128, 128))
     img.draw_line(0, SCREEN_CENTER_Y, sensor.width(), SCREEN_CENTER_Y, color=(128, 128, 128))
-    
+
     save_frame(img)

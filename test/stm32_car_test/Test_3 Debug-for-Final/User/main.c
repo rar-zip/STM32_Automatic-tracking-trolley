@@ -14,6 +14,7 @@ typedef struct {
     int16_t  x_err;     // X轴偏差
     int16_t  y_err;     // Y轴偏差
     uint8_t  status;    // 状态 (1=看到目标, 0=丢失)
+    uint8_t  direction; // 方向 (0=直行, 1=左转, 2=右转)
     uint8_t  checksum;  // 校验和
     uint8_t  tail;      // 0x0D
 } OpenMV_Data_t;
@@ -23,15 +24,30 @@ typedef struct {
 uint8_t rx_buffer[RX_BUF_SIZE]; // DMA 接收缓冲区
 OpenMV_Data_t target_data;      // 解析后的最终数据
 uint8_t new_data_flag = 0;      // 新数据标志位
+int16_t last_x_err = 0;         // 上一帧偏差值（用于阻尼控制）
 
 // 控制参数
 #define BASE_SPEED     85      // 基础速度
 #define MAX_SPEED      95      // 最大速度
-#define MIN_SPEED      60      // 最小速度（确保轮子不会停转）
-#define TURN_SENSITIVITY 0.10  // 转向灵敏度（进一步降低）
-#define MAX_TURN_DIFF  15      // 最大速度差（限制转弯幅度）
-#define LEFT_COMPENSATE 0      // 左轮速度补偿（正值=加快，负值=减慢）
-#define RIGHT_COMPENSATE 0     // 右轮速度补偿（正值=加快，负值=减慢）
+#define MIN_SPEED      40      // 最小速度
+#define DEAD_ZONE      10      // 死区阈值
+#define DAMPING_FACTOR 0.35    // 阻尼系数
+
+// 分级转向参数 - 根据方向自适应调整
+#define STRAIGHT_SENSITIVITY 0.04  // 直行灵敏度（低）
+#define STRAIGHT_MAX_DIFF    6     // 直行最大速度差
+#define LEFT_TURN_SENSITIVITY  0.07  // 左转灵敏度
+#define LEFT_TURN_MAX_DIFF     15    // 左转最大速度差
+#define RIGHT_TURN_SENSITIVITY 0.07  // 右转灵敏度
+#define RIGHT_TURN_MAX_DIFF    15    // 右转最大速度差
+
+// 急弯额外补偿
+#define SHARP_BEND_BOOST 0.03   // 急弯时额外增加的灵敏度
+#define SHARP_BEND_DIFF_BOOST 8 // 急弯时额外增加的速度差
+#define SHARP_BEND_THRESHOLD 80 // 急弯阈值
+
+#define LEFT_COMPENSATE 0      // 左轮速度补偿
+#define RIGHT_COMPENSATE 0     // 右轮速度补偿
 
 
 // ------------------- 2. USART1 与 DMA 初始化函数 -------------------
@@ -110,8 +126,8 @@ int main(void)
     // 【安全机制】等待按下 PA15 按键后，才正式启动循迹
     while(Key_GetNum() == 0);
 
-    // 【测试模式】启动后先测试轮子（反向）
-    // 阶段1: 两个轮子同时后退1秒
+    // 【测试模式】启动后先测试轮子（前进，负值为向前）
+    // 阶段1: 两个轮子同时前进1秒
     Set_Motor(1, -70);
     Set_Motor(2, -70);
     for(uint32_t i=0; i<72000000; i++);
@@ -131,25 +147,62 @@ int main(void)
                 lose_line_cnt = 0;
                 
                 int16_t x_err = target_data.x_err;
+                uint8_t direction = target_data.direction;
                 
-                // 根据X轴偏差计算转向量（反向运动模式）
-                // x_err > 0: 目标在右边，需要向右转（左轮慢，右轮快）
-                // x_err < 0: 目标在左边，需要向左转（左轮快，右轮慢）
-                int16_t turn_amount = -(int16_t)(x_err * TURN_SENSITIVITY);
+                // 死区处理：偏差小于阈值时不转向，直行
+                if (abs(x_err) < DEAD_ZONE) {
+                    x_err = 0;
+                }
                 
-                // 限制最大速度差，防止转弯过猛
-                if (turn_amount > MAX_TURN_DIFF) turn_amount = MAX_TURN_DIFF;
-                if (turn_amount < -MAX_TURN_DIFF) turn_amount = -MAX_TURN_DIFF;
+                // 阻尼控制
+                int16_t delta = x_err - last_x_err;
+                float damping = 1.0;
+                if (x_err * delta < 0 && abs(delta) > 10) {
+                    damping = DAMPING_FACTOR;
+                }
+                last_x_err = x_err;
                 
-                // 计算左右轮速度（反向运动：速度为负值）
+                // 分级转向：根据摄像头检测的方向自适应调整灵敏度和速度差
+                float sensitivity = STRAIGHT_SENSITIVITY;
+                int16_t max_diff = STRAIGHT_MAX_DIFF;
+                
+                // 根据方向选择基础参数
+                if (direction == 1) {
+                    // 检测到左转：使用左转参数
+                    sensitivity = LEFT_TURN_SENSITIVITY;
+                    max_diff = LEFT_TURN_MAX_DIFF;
+                } else if (direction == 2) {
+                    // 检测到右转：使用右转参数
+                    sensitivity = RIGHT_TURN_SENSITIVITY;
+                    max_diff = RIGHT_TURN_MAX_DIFF;
+                }
+                
+                // 急弯额外补偿：偏差超过阈值时增加转向力度
+                if (abs(x_err) >= SHARP_BEND_THRESHOLD) {
+                    sensitivity += SHARP_BEND_BOOST;
+                    max_diff += SHARP_BEND_DIFF_BOOST;
+                }
+                
+                // 计算转向量
+                int16_t turn_amount = (int16_t)(x_err * sensitivity * damping);
+                
+                // 限制最大速度差
+                if (turn_amount > max_diff) turn_amount = max_diff;
+                if (turn_amount < -max_diff) turn_amount = -max_diff;
+                
+                // 计算左右轮速度（前进模式，取负值实现向前）
                 int16_t left_speed  = -(BASE_SPEED + turn_amount + LEFT_COMPENSATE);
                 int16_t right_speed = -(BASE_SPEED - turn_amount + RIGHT_COMPENSATE);
                 
-                // 速度限制（确保两个轮子都不会停转，注意是负值范围）
+                // 速度限制
                 if (left_speed < -MAX_SPEED)  left_speed = -MAX_SPEED;
                 if (left_speed > -MIN_SPEED)  left_speed = -MIN_SPEED;
                 if (right_speed < -MAX_SPEED) right_speed = -MAX_SPEED;
                 if (right_speed > -MIN_SPEED) right_speed = -MIN_SPEED;
+                
+                // 确保两个轮子始终同向转动
+                if (left_speed > 0) left_speed = -MIN_SPEED;
+                if (right_speed > 0) right_speed = -MIN_SPEED;
                 
                 Set_Motor(1, left_speed);
                 Set_Motor(2, right_speed);
@@ -191,19 +244,19 @@ void USART1_IRQHandler(void)
         
         rx_len = RX_BUF_SIZE - DMA_GetCurrDataCounter(DMA1_Channel5);
         
-        // 动态查找帧头
-        if (rx_len >= 9) 
+        // 动态查找帧头 (帧长度现在是10字节：2字节帧头 + 4字节数据 + 2字节状态/方向 + 1字节校验 + 1字节尾)
+        if (rx_len >= 10) 
         {
-            for (int i = 0; i <= rx_len - 9; i++) 
+            for (int i = 0; i <= rx_len - 10; i++) 
             {
-                if (rx_buffer[i] == 0x55 && rx_buffer[i+1] == 0xAA && rx_buffer[i+8] == 0x0D)
+                if (rx_buffer[i] == 0x55 && rx_buffer[i+1] == 0xAA && rx_buffer[i+9] == 0x0D)
                 {
                     uint8_t sum = 0;
-                    for (int j = i; j <= i + 6; j++) { 
+                    for (int j = i; j <= i + 7; j++) { 
                         sum += rx_buffer[j];
                     }
                     
-                    if (sum == rx_buffer[i+7]) // 校验位匹配
+                    if (sum == rx_buffer[i+8]) // 校验位匹配
                     {
                         target_data = *(OpenMV_Data_t*)(&rx_buffer[i]);
                         new_data_flag = 1; 

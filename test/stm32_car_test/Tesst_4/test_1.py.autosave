@@ -47,9 +47,9 @@ LOST_THRESHOLD_MS = 500
 last_detect_time = time.ticks_ms()
 last_offset_x = 0
 last_offset_y = 0
-FILTER_STRENGTH = 0.40    # 提高，响应更快
-DEAD_ZONE = 8            # 减小，响应更灵敏
-TRACKING_DIST_THRESHOLD = 250  # 提高，减少追踪延迟
+FILTER_STRENGTH = 0.35
+DEAD_ZONE = 10
+TRACKING_DIST_THRESHOLD = 200
 last_blob_cx = SCREEN_CENTER_X
 last_blob_cy = SCREEN_CENTER_Y
 
